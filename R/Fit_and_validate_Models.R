@@ -21,45 +21,46 @@ compare_aic <- function(data, #Data in SWD format
   #Make and register cluster
   cl <- parallel::makeCluster(ncores)
   #Register objectes in cluster
-  plan(cluster, workers=cl)
+  future::plan(future::cluster, workers=cl)
   #Get bar progress
-  handlers(handler_progress(format="[:bar] :percent :eta :message"))
+  progressr::handlers(progressr::handler_progress(
+    format="[:bar] :percent :eta :message"))
 
   #Start looping
-  with_progress({
-    pg <- progressor(along=1:nrow(formula_grid))
-    eval_m <- future_lapply(1:nrow(formula_grid), function(x){
+  progressr::with_progress({
+    pg <- progressr::progressor(along=1:nrow(formula_grid))
+    eval_m <- future.apply::future_lapply(1:nrow(formula_grid), function(x){
       tryCatch(
-        {#Get grid x
+        {#Get grid
           grid_x <- formula_grid[x,] #Get i candidate model
           formula_x <- as.formula(grid_x$Formulas) #Get formula from grid x
           reg_x <- grid_x$regm #Get regularization multiplier from grid x
 
           #Complete model with AIC do japones
-          m_aic <- glmnet_mx(p = occ_bg[, pr_bg], data = occ_bg,
+          m_aic <- glmnet_mx(p = data[, pr_bg], data = data,
                              f = formula_x, regmult = reg_x, calculate_AIC = T)
 
           #AIC from Warren (Kuenm)
-          prediction <- predict.glmnet_mx(m_aic, newdata = occ_bg, type = "exponential")
-          vals <- predict.glmnet_mx(m_aic, occ_bg[occ_bg$pr_ab == 1, ],
+          prediction <- predict.glmnet_mx(m_aic, newdata = data, type = "exponential")
+          vals <- predict.glmnet_mx(m_aic, data[data[,pr_bg] == 1, ],
                                     type = "exponential")
           LL <- sum(log(vals + .Machine$double.eps))
           npar <- length(m_aic$betas)
           AICc <- ((2 * npar) - (2 * LL)) + (2 * npar * (npar +
                                                            1)/(length(vals) - npar - 1))
           #Model with kfolds
-          k_fold <- occ_bg$fold
+          k_fold <- data$fold
           mods <- lapply(1:length(unique(k_fold)), function(i) {
-            occ_bg_i <- subset(occ_bg, occ_bg$fold != i) #Select i k-fold
+            data_i <- subset(data, data$fold != i) #Select i k-fold
             #Run model
-            mod_i <- glmnet_mx(p = occ_bg_i[,pr_bg], data = occ_bg_i,
+            mod_i <- glmnet_mx(p = data_i[,pr_bg], data = data_i,
                                f = formula_x, regmult = reg_x,
                                calculate_AIC = FALSE)
 
             #Predict model only to background
-            pred_i <- as.numeric(predict(object = mod_i, newdata = occ_bg, clamp = FALSE,
+            pred_i <- as.numeric(predict(object = mod_i, newdata = data, clamp = FALSE,
                                          type = "cloglog"))
-            pred_i <- cbind(occ_bg[,c("pr_ab", "fold")], "suit" = pred_i)
+            pred_i <- cbind(data[,c(pr_bg, "folds")], "suit" = pred_i)
 
             # #Predict model to spatraster, only to check
             # vars_r <- terra::rast("Models/Araucaria_angustifolia/PCA_variables.tiff")
@@ -67,10 +68,12 @@ compare_aic <- function(data, #Data in SWD format
             # plot(pred_r)
 
             #Extract suitability in train and test points
-            train_xy <- subset(occ_bg, occ_bg$fold != i & pr_ab == 1)[, c("x", "y")]
-            test_xy <- subset(occ_bg, occ_bg$fold == i & pr_ab == 1)[, c("x", "y")]
-            suit_val_cal <- subset(pred_i, occ_bg$fold != i & pr_ab == 1)[, "suit"]
-            suit_val_eval <- subset(pred_i, occ_bg$fold == i & pr_ab == 1)[, "suit"]
+            # train_xy <- subset(data, data$folds != i & pr_bg == 1)[, c("x", "y")]
+            # test_xy <- subset(data, data$folds == i & pr_bg == 1)[, c("x", "y")]
+            suit_val_cal <- subset(pred_i, folds != i & data[,pr_bg] == 1)[, "suit"]
+            suit_val_eval <- subset(pred_i,
+                                    pred_i$folds == i &
+                                      data[,pr_bg] == 1)[, "suit"]
             ####Calculate omission rate following kuenm####
             om_rate <- omrat_maxnet(threshold = c(5, 10),
                                     pred_train = suit_val_cal,
@@ -99,10 +102,11 @@ compare_aic <- function(data, #Data in SWD format
           eval_final <- do.call("rbind", mods)
           return(eval_final)
           #Progress
-          pg(sprintf("i=%g", i))}, #Print progress
+          pg(sprintf("i=%g", x))}, #Print progress
         error = function(e) NULL)
     }, future.chunk.size=1)
   })
+  parallel::stopCluster(cl)
   df_replicates <- do.call("rbind", eval_m)
   return(df_replicates)
 } #End of function
@@ -140,7 +144,7 @@ omrat_maxnet <- function(threshold = 5, pred_train, pred_test) {
   for (i in 1:length(threshold)) {
     val <- ceiling(length(pred_train) * threshold[i]/100) + 1
     omi_val_suit <- sort(pred_train)[val]
-    om_rate[i] <- as.numeric(length(pred_test[pred_train <
+    om_rate[i] <- as.numeric(length(pred_test[pred_test <
                                                     omi_val_suit])/length(pred_test))
   }
   names(om_rate) <- paste("Omission_rate_at_", threshold, sep = "")
@@ -201,7 +205,8 @@ glmnet_mx <- function(p, data, f, regmult = 1.0,
   bb <- c(bb[1], bb[-1][filter])
 
   if (calculate_AIC) {
-    model$AIC <- aic_glmnetmx(x = mm[, filter], y = p, beta = bb)
+    model$AIC <- aic_glmnetmx(x = as.matrix(mm[, filter]),
+                              y = p, beta = bb)
   } else {
     model$AIC <- NA
   }
