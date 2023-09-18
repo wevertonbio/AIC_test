@@ -30,8 +30,6 @@ data_env <- sapply(1:ncol(ranges), function (x) {
 colnames(data_env) <- colnames(ranges)
 
 head(data_env)
-save(data_env, file = "Data/example_data.RData")
-
 
 
 # presences denoting sitinct types of response to variables
@@ -62,6 +60,8 @@ set.seed(20)
 bio7 <- runif(1000, ranges[1, 2], ranges[2, 2])
 bio12 <- runif(1000, ranges[1, 3], ranges[2, 3])
 bio15 <- runif(1000, ranges[1, 4], ranges[2, 4])
+
+save(bio7, bio12, bio15, data_env, file = "Data/example_data.RData")
 
 ## niches with linear responses
 ### uniform values along the range of variables
@@ -110,10 +110,8 @@ v_niches <- lapply(1:length(comb), function(x) {
   ## variances
   vars <- evniche:::var_from_range(range = qranges[, comb[[x]]])
 
-  ## covariance limits
-  #cov_lim <- evniche:::covariance_limits(range = qranges[, comb[[x]]])
   ## variance-covariance matrix
-  cov <- 0  # cov_lim$max_covariance * ifelse(x == 6, 0.5, 0.2) # covariance selected
+  cov <- 0
   varcov <- evniche:::var_cov_matrix(variances = vars, covariances = cov)
 
   ## centroid
@@ -127,12 +125,6 @@ names(v_niches) <- names(comb)
 
 ### generating data from niches and background
 vd_pre_data <- lapply(1:length(v_niches), function(x) {
-  ## predict suitability
-  predp <- evniche:::ell_predict(data = data_env[, comb[[x]]],
-                                 features = v_niches[[x]])
-
-  ## generate new data
-  ## based on the ellipsoid and available conditions
   set.seed(1)
   virtual_data(features = v_niches[[x]], from = "ellipsoid", n = 1000)
 })
@@ -141,10 +133,10 @@ names(vd_pre_data) <- names(v_niches)
 
 ### complete missing rows
 vd_pre_data[[1]] <- cbind(bio_1 = vd_pre_data[[1]][, 1], bio_7 = bio7,
-                          bio_12 = vd_pre_data[[1]][, 1], bio_15 = bio15)
+                          bio_12 = vd_pre_data[[1]][, 2], bio_15 = bio15)
 vd_pre_data[[2]] <- cbind(vd_pre_data[[2]], bio_15 = bio15)
 
-### quadratic fro one variable
+### quadratic for one variable
 quad_1var <- cbind(bio_1 = vd_pre_data[[1]][, 1], bio_7 = bio7, bio_12 = bio12,
                    bio_15 = bio15)
 
@@ -164,5 +156,50 @@ data_q4 <- rbind(data.frame(pres_back = 1, vd_pre_data[[3]]),
 ### save the data
 save(data_q1, data_q2, data_q3, data_q4, file = "Data/data_quadratic.RData")
 
-## niches with product responses (linear and quadratic as well)
 
+## niches with product responses (linear and quadratic as well)
+### virtual niches
+v_nichesp <- lapply(1:length(comb), function(x) {
+  ## variances
+  vars <- evniche:::var_from_range(range = qranges[, comb[[x]]])
+
+  ## covariance limits
+  cov_lim <- covariance_limits1(range = qranges[, comb[[x]]], prop_reg = 0.001)
+  ## variance-covariance matrix
+  covm <- cov_lim$max_covariance
+  varcov <- evniche:::var_cov_matrix(variances = vars, covariances = covm)
+
+  ## centroid
+  cent <- evniche:::centroid(range = qranges[, comb[[x]]])
+
+  ## ellipsoid characteristics (virtual niche)
+  ell_features(centroid = cent, covariance_matrix = varcov, level = 0.99)
+})
+
+names(v_nichesp) <- names(comb)
+
+### generating data from niches and background
+vd_pre_datap <- lapply(1:length(v_nichesp), function(x) {
+  set.seed(1)
+  virtual_data(features = v_nichesp[[x]], from = "ellipsoid", n = 1000)
+})
+
+names(vd_pre_datap) <- names(v_nichesp)
+
+### complete missing rows
+vd_pre_datap[[1]] <- cbind(bio_1 = vd_pre_datap[[1]][, 1], bio_7 = bio7,
+                          bio_12 = vd_pre_datap[[1]][, 2], bio_15 = bio15)
+vd_pre_datap[[2]] <- cbind(vd_pre_datap[[2]], bio_15 = bio15)
+
+### preparing data for models (linear and quadratic responses)
+data_p2 <- rbind(data.frame(pres_back = 1, vd_pre_datap[[1]]),
+                 data.frame(pres_back = 0, background))
+
+data_p3 <- rbind(data.frame(pres_back = 1, vd_pre_datap[[2]]),
+                 data.frame(pres_back = 0, background))
+
+data_p4 <- rbind(data.frame(pres_back = 1, vd_pre_datap[[3]]),
+                 data.frame(pres_back = 0, background))
+
+### save the data
+save(data_p2, data_p3, data_p4, file = "Data/data_product.RData")
