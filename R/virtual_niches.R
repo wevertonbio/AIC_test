@@ -40,7 +40,7 @@ summary(data_env)
 
 ## sample of background
 set.seed(1)
-background <- data_env[sample(100000, 20000), ]
+background <- data_env[sample(100000, 10000), ]
 
 #background <- data_l1[data_l1$pres_back == 0, -1]
 save(background, file = "Data/background.RData")
@@ -64,37 +64,29 @@ bio12 <- runif(1000, ranges[1, 3], ranges[2, 3])
 bio15 <- runif(1000, ranges[1, 4], ranges[2, 4])
 
 ## niches with linear responses
-### linear probabilities
-lprobs <- 1:1000000 / 1000000
-sprobs <- 1:100000 / 100000
-s1probs <- 1:10000 / 10000
-s2probs <- 1:1000 / 1000
+### uniform values along the range of variables
+nls <- 44
 
-### creating positive records: linear response to one variable
-data_envs <- data_env[order(data_env[, "bio_1"]), ]
-set.seed(10)
-data_pres <- data_envs[sample(1000000, 100000, prob = lprobs), ]
-set.seed(10)
-data_l1 <- data_pres[sample(100000, 100), ]
+set.seed(40)
+bu1 <- sort(runif(nls, ranges[1, 1], ranges[2, 1]))
+bu7 <- sort(runif(nls, ranges[1, 2], ranges[2, 2]))
+bu12 <- sort(runif(nls, ranges[1, 3], ranges[2, 3]))
+bu15 <- sort(runif(nls, ranges[1, 4], ranges[2, 4]))
 
-### creating positive records: linear response to two variables
-data_pres <- data_pres[order(data_pres[, "bio_12"]), ]
-set.seed(10)
-data_pres <- data_pres[sample(100000, 10000, prob = sprobs), ]
-set.seed(10)
-data_l2 <- data_pres[sample(10000, 100), ]
+### values with increasing probabilities towards high
+reps <- 1:nls
+reps[(nls-3):nls] <- reps[(nls-3):nls] + 1:4
 
-### creating positive records: linear response to three variables
-data_pres <- data_pres[order(data_pres[, "bio_7"]), ]
-set.seed(10)
-data_pres <- data_pres[sample(10000, 1000, prob = s1probs), ]
-set.seed(10)
-data_l3 <- data_pres[sample(1000, 100), ]
+bl1 <- unlist(lapply(1:nls, function(x) {rep(bu1[x], reps[x])}))
+bl7 <- unlist(lapply(1:nls, function(x) {rep(bu7[x], reps[x])}))
+bl12 <- unlist(lapply(1:nls, function(x) {rep(bu12[x], reps[x])}))
+bl15 <- unlist(lapply(1:nls, function(x) {rep(bu15[x], reps[x])}))
 
-### creating positive records: linear response to four variables
-data_pres <- data_pres[order(data_pres[, "bio_15"]), ]
-set.seed(10)
-data_l4 <- data_pres[sample(1000, 100, prob = s2probs), ]
+### data with linear responses
+data_l1 <- cbind(bio_1 = bl1, bio_7 = bio7, bio_12 = bio12, bio_15 = bio15)
+data_l2 <- cbind(bio_1 = bl1, bio_7 = bio7, bio_12 = bl12, bio_15 = bio15)
+data_l3 <- cbind(bio_1 = bl1, bio_7 = bl7, bio_12 = bl12, bio_15 = bio15)
+data_l4 <- cbind(bio_1 = bl1, bio_7 = bl7, bio_12 = bl12, bio_15 = bl15)
 
 ### preparing data for models (linear responses)
 data_l1 <- rbind(data.frame(pres_back = 1, data_l1),
