@@ -1,6 +1,19 @@
 library(geodata)
 library(evniche)
 
+# function for niches with linear responses
+linear_respone <- function(variables, slopes) {
+  l <- sapply(1:ncol(variables), function(x) {
+    variables[, x] * slopes[x]
+  })
+  if (ncol(variables) != 1) {
+    l <- apply(l, 1, sum)
+  } else {
+    l <- l[, 1]
+  }
+  return((l - min(l)) / (max(l) - min(l)))
+}
+
 # directory for Data
 dir.create("Data")
 
@@ -17,7 +30,7 @@ selected <- c(1, 7, 12, 15)
 
 var <- var[[selected]]
 
-# uniform distribution of environments accornig to ranges of environments
+# uniform distribution of environments according to ranges of environments
 ## ranges
 ranges <- minmax(var)
 
@@ -32,7 +45,7 @@ colnames(data_env) <- colnames(ranges)
 head(data_env)
 
 
-# presences denoting sitinct types of response to variables
+# presences denoting distinct types of response to variables
 ## descriptive stats of example data (background)
 summary(data_env)
 
@@ -64,29 +77,34 @@ bio15 <- runif(1000, ranges[1, 4], ranges[2, 4])
 save(bio7, bio12, bio15, data_env, file = "Data/example_data.RData")
 
 ## niches with linear responses
-### uniform values along the range of variables
-nls <- 44
+### defining probabilities for niches with linear responses
+lin_1var <- linear_respone(variables = matrix(data_env[, 1], ncol = 1),
+                           slopes = 3)
+lin_2var <- linear_respone(variables = data_env[, comb[[1]]],
+                           slopes = c(500, 5))
+lin_3var <- linear_respone(variables = data_env[, comb[[2]]],
+                           slopes = c(500, 1000, 5))
+lin_4var <- linear_respone(variables = data_env[, comb[[3]]],
+                           slopes = c(500, 1000, 5, 300))
 
-set.seed(40)
-bu1 <- sort(runif(nls, ranges[1, 1], ranges[2, 1]))
-bu7 <- sort(runif(nls, ranges[1, 2], ranges[2, 2]))
-bu12 <- sort(runif(nls, ranges[1, 3], ranges[2, 3]))
-bu15 <- sort(runif(nls, ranges[1, 4], ranges[2, 4]))
+#plot(data_env[, 1], lin_1var)
 
-### values with increasing probabilities towards high
-reps <- 1:nls
-reps[(nls-3):nls] <- reps[(nls-3):nls] + 1:4
-
-bl1 <- unlist(lapply(1:nls, function(x) {rep(bu1[x], reps[x])}))
-bl7 <- unlist(lapply(1:nls, function(x) {rep(bu7[x], reps[x])}))
-bl12 <- unlist(lapply(1:nls, function(x) {rep(bu12[x], reps[x])}))
-bl15 <- unlist(lapply(1:nls, function(x) {rep(bu15[x], reps[x])}))
+### rows to select data with increasing probabilities towards the high end
+set.seed(12)
+bl1 <- sort(sample(nrow(data_env), 1000, prob = lin_1var))
+bl2 <- sort(sample(nrow(data_env), 1000, prob = lin_2var))
+bl3 <- sort(sample(nrow(data_env), 1000, prob = lin_3var))
+bl4 <- sort(sample(nrow(data_env), 1000, prob = lin_4var))
 
 ### data with linear responses
-data_l1 <- cbind(bio_1 = bl1, bio_7 = bio7, bio_12 = bio12, bio_15 = bio15)
-data_l2 <- cbind(bio_1 = bl1, bio_7 = bio7, bio_12 = bl12, bio_15 = bio15)
-data_l3 <- cbind(bio_1 = bl1, bio_7 = bl7, bio_12 = bl12, bio_15 = bio15)
-data_l4 <- cbind(bio_1 = bl1, bio_7 = bl7, bio_12 = bl12, bio_15 = bl15)
+data_l1 <- cbind(bio_1 = data_env[bl1, 1],
+                 bio_7 = bio7, bio_12 = bio12, bio_15 = bio15)
+data_l2 <- cbind(bio_1 = data_env[bl2, 1], bio_7 = bio7,
+                 bio_12 = data_env[bl2, 3], bio_15 = bio15)
+data_l3 <- cbind(bio_1 = data_env[bl3, 1], bio_7 = data_env[bl3, 2],
+                 bio_12 = data_env[bl3, 3], bio_15 = bio15)
+data_l4 <- cbind(bio_1 = data_env[bl4, 1], bio_7 = data_env[bl4, 2],
+                 bio_12 = data_env[bl4, 3], bio_15 = data_env[bl4, 4])
 
 ### preparing data for models (linear responses)
 data_l1 <- rbind(data.frame(pres_back = 1, data_l1),
@@ -131,7 +149,7 @@ vd_pre_data <- lapply(1:length(v_niches), function(x) {
 
 names(vd_pre_data) <- names(v_niches)
 
-### complete missing rows
+### complete missing columns
 vd_pre_data[[1]] <- cbind(bio_1 = vd_pre_data[[1]][, 1], bio_7 = bio7,
                           bio_12 = vd_pre_data[[1]][, 2], bio_15 = bio15)
 vd_pre_data[[2]] <- cbind(vd_pre_data[[2]], bio_15 = bio15)
@@ -186,7 +204,7 @@ vd_pre_datap <- lapply(1:length(v_nichesp), function(x) {
 
 names(vd_pre_datap) <- names(v_nichesp)
 
-### complete missing rows
+### complete missing columns
 vd_pre_datap[[1]] <- cbind(bio_1 = vd_pre_datap[[1]][, 1], bio_7 = bio7,
                           bio_12 = vd_pre_datap[[1]][, 2], bio_15 = bio15)
 vd_pre_datap[[2]] <- cbind(vd_pre_datap[[2]], bio_15 = bio15)
