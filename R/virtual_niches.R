@@ -87,7 +87,7 @@ lin_3var <- linear_respone(variables = data_env[, comb[[2]]],
 lin_4var <- linear_respone(variables = data_env[, comb[[3]]],
                            slopes = c(500, 1000, 5, 300))
 
-#plot(data_env[, 1], lin_1var)
+plot(data_env[, 1], lin_1var)
 
 ### rows to select data with increasing probabilities towards the high end
 set.seed(12)
