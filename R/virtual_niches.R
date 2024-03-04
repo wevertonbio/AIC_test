@@ -87,13 +87,13 @@ save(bio7, bio12, bio15, data_env, file = "Data/example_data.RData")
 lin_1var <- linear_respone(variables = matrix(data_env[, 1], ncol = 1),
                            slopes = 3)
 lin_2var <- linear_respone(variables = data_env[, comb[[1]]],
-                           slopes = c(500, 5))
+                           slopes = c(700, 5))
 lin_3var <- linear_respone(variables = data_env[, comb[[2]]],
-                           slopes = c(500, 1000, 5))
+                           slopes = c(700, 1000, 5))
 lin_4var <- linear_respone(variables = data_env[, comb[[3]]],
-                           slopes = c(500, 1000, 5, 300))
+                           slopes = c(700, 1000, 5, 300))
 
-#plot(data_env[, 1], lin_1var)
+plot(data_env[, 4], lin_4var)
 
 ### rows to select data with increasing probabilities towards the high end
 set.seed(12)
